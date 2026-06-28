@@ -1,7 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local Logger = require(ReplicatedStorage.Modules.Shared.Logger)
+local Logger = require(ReplicatedStorage.Modules.Core.Logger)
 local GameConfig = require(ReplicatedStorage.Config.GameConfig)
 local ServiceLoader = require(ServerScriptService.Boot.ServiceLoader)
 
