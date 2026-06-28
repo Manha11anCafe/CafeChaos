@@ -8,6 +8,7 @@ local QueueService = {
 	Name = "QueueService"
 }
 
+QueueService.QueueOrder = {}
 QueueService.QueuePoints = {}
 QueueService.Occupied = {}
 
@@ -42,6 +43,7 @@ function QueueService:Assign(customer)
 
 	if not point then
 		Logger:Info(self.Name, "Queue is full!")
+        table.insert(self.QueueOrder, customer)
 		return
 	end
 
@@ -89,6 +91,41 @@ function QueueService:MoveNPC(npc, targetPosition)
 	for _, waypoint in ipairs(waypoints) do
 		humanoid:MoveTo(waypoint.Position)
 		humanoid.MoveToFinished:Wait()
+	end
+end
+
+function QueueService:ReorderQueue()
+
+	for index, customer in ipairs(self.QueueOrder) do
+
+		local point = self.QueuePoints[index]
+
+		if customer and customer.Model and point then
+
+			customer.QueueIndex = index
+			customer.Target = point
+
+			local npc = customer.Model
+
+			if npc then
+				task.spawn(function()
+					self:MoveNPC(npc, point)
+				end)
+			end
+		end
+	end
+end
+
+function QueueService:RemoveCustomer(customerId)
+
+	for i, customer in ipairs(self.QueueOrder) do
+		if customer.Id == customerId then
+			table.remove(self.QueueOrder, i)
+			self.Occupied[i] = nil
+
+			self:ReorderQueue()
+			return
+		end
 	end
 end
 
