@@ -8,10 +8,19 @@ function Customer.new(id)
 
 	self.Id = id
 	self.State = CustomerState.Idle
-	self.Order = nil
-	self.Patience = 100
-	self.Mood = "Neutral"
-	self.Reward = 0
+	self.Model = nil
+    self.Humanoid = nil
+    self.RootPart = nil
+
+    self.Order = nil
+
+    self.Patience = 100
+    self.Mood = "Neutral"
+    self.Reward = 0
+
+    self.QueueIndex = nil
+    self.Seat = nil
+    self.Target = nil
 
 	return self
 end
