@@ -1,6 +1,6 @@
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local PathfindingService = game:GetService("PathfindingService")
+local NPCController = require(script.Parent.Parent.Systems.NPCController)
 
 local Logger = require(ReplicatedStorage.Modules.Core.Logger)
 
@@ -8,8 +8,8 @@ local QueueService = {
 	Name = "QueueService"
 }
 
-QueueService.QueueOrder = {}
 QueueService.QueuePoints = {}
+QueueService.QueueOrder = {}
 QueueService.Occupied = {}
 
 function QueueService:Init()
@@ -39,15 +39,17 @@ function QueueService:GetFreePosition()
 end
 
 function QueueService:Assign(customer)
+
 	local index, point = self:GetFreePosition()
 
 	if not point then
 		Logger:Info(self.Name, "Queue is full!")
-        table.insert(self.QueueOrder, customer)
 		return
 	end
 
 	self.Occupied[index] = customer.Id
+	table.insert(self.QueueOrder, customer)
+
 	customer.QueueIndex = index
 	customer.Target = point
 
@@ -57,60 +59,41 @@ function QueueService:Assign(customer)
 	)
 
 	local npc = customer.Model
-	if npc and npc.PrimaryPart then
+
+	if npc then
 		task.spawn(function()
-	        self:MoveNPC(npc, point)
+	        NPCController:MoveTo(npc, point)
         end)
 	end
 end
 
-function QueueService:Start()
-	Logger:Info(self.Name, "Start")
-end
+function QueueService:CleanQueue()
+	local newList = {}
 
-function QueueService:MoveNPC(npc, targetPosition)
-
-	local humanoid = npc:FindFirstChildOfClass("Humanoid")
-	local root = npc:FindFirstChild("HumanoidRootPart")
-
-	if not humanoid or not root then
-		return
+	for _, customer in ipairs(self.QueueOrder) do
+		if customer then
+			table.insert(newList, customer)
+		end
 	end
 
-	local path = PathfindingService:CreatePath()
-
-	path:ComputeAsync(root.Position, targetPosition.Position)
-
-	if path.Status ~= Enum.PathStatus.Success then
-		warn("[QueueService] Path failed")
-		return
-	end
-
-	local waypoints = path:GetWaypoints()
-
-	for _, waypoint in ipairs(waypoints) do
-		humanoid:MoveTo(waypoint.Position)
-		humanoid.MoveToFinished:Wait()
-	end
+	self.QueueOrder = newList
 end
 
 function QueueService:ReorderQueue()
 
 	for index, customer in ipairs(self.QueueOrder) do
 
-		local point = self.QueuePoints[index]
-
-		if customer and customer.Model and point then
+		if customer and customer.Model and self.QueuePoints[index] then
 
 			customer.QueueIndex = index
-			customer.Target = point
+			customer.Target = self.QueuePoints[index]
 
 			local npc = customer.Model
 
 			if npc then
 				task.spawn(function()
-					self:MoveNPC(npc, point)
-				end)
+	                NPCController:MoveTo(npc, self.QueuePoints[index])
+                end)
 			end
 		end
 	end
@@ -119,14 +102,43 @@ end
 function QueueService:RemoveCustomer(customerId)
 
 	for i, customer in ipairs(self.QueueOrder) do
-		if customer.Id == customerId then
+		if customer and customer.Id == customerId then
 			table.remove(self.QueueOrder, i)
 			self.Occupied[i] = nil
 
+			self:CleanQueue()
 			self:ReorderQueue()
 			return
 		end
 	end
+end
+
+function QueueService:SendCustomerOut(customer)
+
+	if not customer then return end
+
+	local npc = customer.Model
+	local exit = Workspace:FindFirstChild("ExitPoint")
+
+	if not npc or not exit then
+		return
+	end
+
+	task.spawn(function()
+
+	    NPCController:MoveTo(npc, exit)
+
+	    if npc.Parent then
+		    npc:Destroy()
+	    end
+
+    end)
+
+	self:RemoveCustomer(customer.Id)
+end
+
+function QueueService:Start()
+	Logger:Info(self.Name, "Start")
 end
 
 return QueueService
