@@ -2,14 +2,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Logger = require(ReplicatedStorage.Modules.Shared.Logger)
 
-local TestService = {}
+local TestService = {
+	Name = "TestService"
+}
 
 function TestService:Init()
-	Logger:Info("TestService", "Init")
+	Logger:Info(self.Name, "Init")
 end
 
 function TestService:Start()
-	Logger:Info("TestService", "Start")
+	Logger:Info(self.Name, "Start")
 end
 
 return TestService
