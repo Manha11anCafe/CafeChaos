@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local QueueService = require(script.Parent.QueueService)
 local NPCFactory = require(script.Parent.Parent.Systems.NPCFactory)
 local Logger = require(ReplicatedStorage.Modules.Core.Logger)
 local Customer = require(ReplicatedStorage.Modules.Customer.Customer)
@@ -23,7 +24,9 @@ function CustomerService:Start()
 	self.Customers[customer.Id] = customer
 	self.NextCustomerId += 1
 
-	NPCFactory:CreateCustomer(customer)
+	local npc = NPCFactory:CreateCustomer(customer)
+
+    QueueService:Assign(customer)
 
 	Logger:Info(
 		self.Name,
