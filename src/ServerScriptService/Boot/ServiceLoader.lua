@@ -1,3 +1,5 @@
+local ServiceRegistry = require(script.Parent.ServiceRegistry)
+
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local ServicesFolder = ServerScriptService:WaitForChild("Services")
@@ -14,6 +16,8 @@ function ServiceLoader:Load()
 		if moduleScript:IsA("ModuleScript") then
 
 			local service = require(moduleScript)
+            
+            ServiceRegistry:Register(service.Name, service)
 
 			table.insert(Services, service)
 
