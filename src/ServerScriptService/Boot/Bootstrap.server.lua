@@ -1,3 +1,8 @@
-print("[Bootstrap] Server is starting...")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-print("[Bootstrap] Initialization complete.")
+local Logger = require(
+	ReplicatedStorage.Modules.Shared.Logger
+)
+
+Logger:Info("Bootstrap", "Server is starting...")
+Logger:Info("Bootstrap", "Initialization complete.")
