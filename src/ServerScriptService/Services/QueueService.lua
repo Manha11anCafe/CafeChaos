@@ -1,25 +1,27 @@
+-- QueueService.lua
 local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local NPCController = require(script.Parent.Parent.Systems.NPCController)
 
-local Logger = require(ReplicatedStorage.Modules.Core.Logger)
+local MOVE_TIMEOUT = 10 -- วินาที ถ้าเกินนี้ให้ Destroy เลย
 
 local QueueService = {
 	Name = "QueueService"
 }
 
 QueueService.QueuePoints = {}
-QueueService.QueueOrder = {}
-QueueService.Occupied = {}
+QueueService.QueueOrder  = {}
+QueueService.Occupied    = {}
 
 function QueueService:Init()
-	Logger:Info(self.Name, "Init")
 
-	local queueFolder = Workspace:WaitForChild("QueuePoints")
+	local folder = Workspace:WaitForChild("QueuePoints")
 
-	for _, point in ipairs(queueFolder:GetChildren()) do
-		if point:IsA("BasePart") then
-			table.insert(self.QueuePoints, point)
+	self.QueuePoints = {}
+	self.QueueOrder  = {}
+	self.Occupied    = {}
+
+	for _, p in ipairs(folder:GetChildren()) do
+		if p:IsA("BasePart") and p.Name ~= "ExitPoint" then
+			table.insert(self.QueuePoints, p)
 		end
 	end
 
@@ -28,117 +30,140 @@ function QueueService:Init()
 	end)
 end
 
-function QueueService:GetFreePosition()
-	for index, point in ipairs(self.QueuePoints) do
-		if not self.Occupied[index] then
-			return index, point
+function QueueService:GetFree()
+	for i = 1, #self.QueuePoints do
+		if not self.Occupied[i] then
+			return i, self.QueuePoints[i]
 		end
 	end
-
 	return nil, nil
 end
 
 function QueueService:Assign(customer)
 
-	local index, point = self:GetFreePosition()
+	if not customer or not customer.Model then return end
 
-	if not point then
-		Logger:Info(self.Name, "Queue is full!")
-		return
-	end
+	local index, point = self:GetFree()
+	if not index then return end
 
-	self.Occupied[index] = customer.Id
+	self.Occupied[index]  = customer.Id
+	customer.QueueIndex   = index
+	customer.Target       = point
+
 	table.insert(self.QueueOrder, customer)
+	self:Move(customer.Model, point)
+end
 
-	customer.QueueIndex = index
-	customer.Target = point
+function QueueService:Move(npc, point)
 
-	Logger:Info(
-		self.Name,
-		string.format("Assigned Customer #%d to Queue %d", customer.Id, index)
-	)
-
-	local npc = customer.Model
-
-	if npc then
-		task.spawn(function()
-	        NPCController:MoveTo(npc, point)
-        end)
+	local hum = npc and npc:FindFirstChildOfClass("Humanoid")
+	if hum and point then
+		hum:MoveTo(point.Position)
 	end
 end
 
-function QueueService:CleanQueue()
-	local newList = {}
+function QueueService:Reorder()
 
-	for _, customer in ipairs(self.QueueOrder) do
-		if customer then
-			table.insert(newList, customer)
-		end
-	end
+	local new = {}
+	self.Occupied = {}
 
-	self.QueueOrder = newList
-end
+	for _, c in ipairs(self.QueueOrder) do
+		if c and c.Model then
+			local index = #new + 1
+			local point = self.QueuePoints[index]
 
-function QueueService:ReorderQueue()
+			if point then
+				c.QueueIndex         = index
+				self.Occupied[index] = c.Id
 
-	for index, customer in ipairs(self.QueueOrder) do
-
-		if customer and customer.Model and self.QueuePoints[index] then
-
-			customer.QueueIndex = index
-			customer.Target = self.QueuePoints[index]
-
-			local npc = customer.Model
-
-			if npc then
-				task.spawn(function()
-	                NPCController:MoveTo(npc, self.QueuePoints[index])
-                end)
+				self:Move(c.Model, point)
+				table.insert(new, c)
 			end
 		end
 	end
+
+	self.QueueOrder = new
 end
 
-function QueueService:RemoveCustomer(customerId)
+-- หา ExitPoint ทั้งใน Workspace และใน QueuePoints folder
+local function getExit()
+	return Workspace:FindFirstChild("ExitPoint")
+		or Workspace.QueuePoints:FindFirstChild("ExitPoint")
+end
 
-	for i, customer in ipairs(self.QueueOrder) do
-		if customer and customer.Id == customerId then
-			table.remove(self.QueueOrder, i)
-			self.Occupied[i] = nil
+-- เดินไปจุดออก รอถึงจริงๆ หรือ timeout แล้ว Destroy
+local function walkToExitAndDestroy(npc)
 
-			self:CleanQueue()
-			self:ReorderQueue()
-			return
+	local exit = getExit()
+	if not exit then
+		if npc and npc.Parent then npc:Destroy() end
+		return
+	end
+
+	local hum = npc:FindFirstChildOfClass("Humanoid")
+	if not hum then
+		if npc and npc.Parent then npc:Destroy() end
+		return
+	end
+
+	hum:MoveTo(exit.Position)
+
+	local done = false
+
+	task.delay(MOVE_TIMEOUT, function()
+		if not done then
+			done = true
+			if npc and npc.Parent then npc:Destroy() end
 		end
+	end)
+
+	hum.MoveToFinished:Wait()
+
+	if not done then
+		done = true
+		if npc and npc.Parent then npc:Destroy() end
 	end
 end
 
-function QueueService:SendCustomerOut(customer)
+function QueueService:SendOut(customer)
 
 	if not customer then return end
 
 	local npc = customer.Model
-	local exit = Workspace:FindFirstChild("ExitPoint")
 
-	if not npc or not exit then
-		return
+	for i, c in ipairs(self.QueueOrder) do
+		if c.Id == customer.Id then
+			table.remove(self.QueueOrder, i)
+			break
+		end
 	end
 
-	task.spawn(function()
+	if customer.QueueIndex then
+		self.Occupied[customer.QueueIndex] = nil
+	end
 
-	    NPCController:MoveTo(npc, exit)
+	self:Reorder()
 
-	    if npc.Parent then
-		    npc:Destroy()
-	    end
+	if npc then
+		task.spawn(walkToExitAndDestroy, npc)
+	end
+end
 
-    end)
+function QueueService:Clear()
 
-	self:RemoveCustomer(customer.Id)
+	local snapshot = table.move(self.QueueOrder, 1, #self.QueueOrder, 1, {})
+
+	self.QueueOrder = {}
+	self.Occupied   = {}
+
+	for _, c in ipairs(snapshot) do
+		if c.Model then
+			task.spawn(walkToExitAndDestroy, c.Model)
+		end
+	end
 end
 
 function QueueService:Start()
-	Logger:Info(self.Name, "Start")
 end
 
 return QueueService

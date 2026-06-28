@@ -1,46 +1,39 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Logger = require(ReplicatedStorage.Modules.Core.Logger)
-
-local NPCFactory = {
-	Name = "NPCFactory"
-}
-
--- 📌 ดึง Template จาก ReplicatedStorage
-local function getTemplate()
-	local assets = ReplicatedStorage:WaitForChild("Assets")
-	local npcFolder = assets:WaitForChild("NPC")
-	local template = npcFolder:WaitForChild("CustomerTemplate")
-
-	return template
-end
+local NPCFactory = {}
 
 function NPCFactory:SpawnCustomer(id)
 
-	local template = getTemplate()
+    local template = ReplicatedStorage
+        :WaitForChild("Assets")
+        :WaitForChild("NPC")
+        :WaitForChild("CustomerTemplate")
 
-	if not template then
-		warn("[NPCFactory] CustomerTemplate not found")
-		return nil
-	end
+    local npc = template:Clone()
+    npc.Name = "Customer_" .. id
 
-	local clone = template:Clone()
-	clone.Name = "Customer_" .. id
+    -- หา spawn point
+    local spawnFolder = workspace:FindFirstChild("NPCSpawn")
+    local spawnPart = spawnFolder and spawnFolder:FindFirstChildOfClass("BasePart")
 
-	-- 📌 วางใน workspace สำหรับ NPC ที่ active อยู่
-	local customersFolder = workspace:FindFirstChild("Customers")
+    -- วาง NPC ที่ spawn point ก่อน parent
+    if spawnPart then
+        local root = npc:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = spawnPart.CFrame + Vector3.new(0, 3, 0)
+        end
+    end
 
-	if not customersFolder then
-		customersFolder = Instance.new("Folder")
-		customersFolder.Name = "Customers"
-		customersFolder.Parent = workspace
-	end
+    local folder = workspace:FindFirstChild("Customers")
+    if not folder then
+        folder = Instance.new("Folder")
+        folder.Name = "Customers"
+        folder.Parent = workspace
+    end
 
-	clone.Parent = customersFolder
+    npc.Parent = folder
 
-	Logger:Info(self.Name, "Spawned NPC for Customer #" .. id)
-
-	return clone
+    return npc
 end
 
 return NPCFactory

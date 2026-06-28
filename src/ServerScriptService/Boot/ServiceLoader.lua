@@ -1,3 +1,4 @@
+-- ServiceLoader.lua
 local ServiceRegistry = require(script.Parent.ServiceRegistry)
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -7,48 +8,52 @@ local ServiceLoader = {}
 
 function ServiceLoader:Load()
 
-	local Services = {}
+	local services = {}
 
-	-- load all services
+	-- 1. require ทุก service
 	for _, moduleScript in ipairs(ServicesFolder:GetChildren()) do
 		if moduleScript:IsA("ModuleScript") then
 
-			local success, service = pcall(require, moduleScript)
+			local ok, service = pcall(require, moduleScript)
 
-			if success and service then
+			if ok and type(service) == "table" then
+
+				if not service.Name then
+					service.Name = moduleScript.Name
+				end
+
 				ServiceRegistry:Register(service.Name, service)
-				table.insert(Services, service)
+				table.insert(services, service)
+
 			else
-				warn("[ServiceLoader] Failed to load:", moduleScript.Name)
+				warn(string.format("[ServiceLoader] require failed: %s — %s", moduleScript.Name, tostring(service)))
 			end
 		end
 	end
 
-	-- sort
-	table.sort(Services, function(a, b)
-		return (a.Name or "") < (b.Name or "")
-	end)
-
-	-- INIT PHASE
-	for _, service in ipairs(Services) do
-		if service.Init then
-			print("[ServiceLoader] Init:", service.Name)
-			service:Init()
+	-- 2. Init ทีละตัว — ถ้าพังให้ warn แต่ไม่หยุด service อื่น
+	for _, s in ipairs(services) do
+		if s.Init then
+			local ok, err = pcall(function() s:Init() end)
+			if not ok then
+				warn(string.format("[ServiceLoader] Init failed: %s — %s", s.Name, tostring(err)))
+			end
 		end
 	end
 
-	-- START PHASE
-	for _, service in ipairs(Services) do
-		if service.Start then
-			print("[ServiceLoader] Start:", service.Name)
+	-- 3. Start ทีละตัว — spawn แยก thread กันบล็อกกัน
+	for _, s in ipairs(services) do
+		if s.Start then
 			task.spawn(function()
-				service:Start()
+				local ok, err = pcall(function() s:Start() end)
+				if not ok then
+					warn(string.format("[ServiceLoader] Start failed: %s — %s", s.Name, tostring(err)))
+				end
 			end)
 		end
 	end
 
-	print("[ServiceLoader] ALL SERVICES LOADED")
-
+	print("[ServiceLoader] All services loaded.")
 end
 
 return ServiceLoader

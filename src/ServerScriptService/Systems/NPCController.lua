@@ -1,90 +1,72 @@
 local PathfindingService = game:GetService("PathfindingService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local NPCController = {}
+local Logger = require(ReplicatedStorage.Modules.Core.Logger)
 
-local ActiveMoves = {}
+local NPCController = {
+	Name = "NPCController"
+}
 
-local function GetHumanoid(model)
-	return model:FindFirstChildOfClass("Humanoid")
-end
+-- =========================
+-- MOVE LOCK (กันเดินซ้อน)
+-- =========================
+local Moving = {}
 
-local function GetRoot(model)
-	return model:FindFirstChild("HumanoidRootPart")
-end
+-- =========================
+-- MAIN MOVE FUNCTION
+-- =========================
+function NPCController:MoveTo(npc, targetPart)
 
-function NPCController:CancelMove(model)
+	if not npc or not targetPart then return end
+	if Moving[npc] then return end
 
-	local move = ActiveMoves[model]
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	local root = npc:FindFirstChild("HumanoidRootPart")
 
-	if move then
-		move.Cancelled = true
-	end
+	if not humanoid or not root then return end
 
-end
+	Moving[npc] = true
 
-function NPCController:MoveTo(model, destination)
+	task.spawn(function()
 
-	if not model then
-		return
-	end
+		local path = PathfindingService:CreatePath({
+			AgentRadius = 2,
+			AgentHeight = 5,
+			AgentCanJump = false
+		})
 
-	local humanoid = GetHumanoid(model)
-	local root = GetRoot(model)
+		local success, err = pcall(function()
+			path:ComputeAsync(root.Position, targetPart.Position)
+		end)
 
-	if not humanoid or not root then
-		return
-	end
-
-	self:CancelMove(model)
-
-	local moveData = {
-		Cancelled = false
-	}
-
-	ActiveMoves[model] = moveData
-
-	local path = PathfindingService:CreatePath()
-
-	path:ComputeAsync(
-		root.Position,
-		destination.Position
-	)
-
-	if path.Status ~= Enum.PathStatus.Success then
-		return
-	end
-
-	local waypoints = path:GetWaypoints()
-    	for _, waypoint in ipairs(waypoints) do
-
-		if moveData.Cancelled then
-			return false
+		if not success or path.Status ~= Enum.PathStatus.Success then
+			-- fallback move
+			humanoid:MoveTo(targetPart.Position)
+			humanoid.MoveToFinished:Wait()
+			Moving[npc] = nil
+			return
 		end
 
-		if waypoint.Action == Enum.PathWaypointAction.Jump then
-			humanoid.Jump = true
+		local waypoints = path:GetWaypoints()
+
+		for _, wp in ipairs(waypoints) do
+
+			if not npc.Parent then
+				Moving[npc] = nil
+				return
+			end
+
+			humanoid:MoveTo(wp.Position)
+			local reached = humanoid.MoveToFinished:Wait()
+
+			-- ถ้าตาย/โดนแทรก/หาย ให้หยุด
+			if not reached then
+				break
+			end
 		end
 
-		humanoid:MoveTo(waypoint.Position)
-
-		local reached = humanoid.MoveToFinished:Wait()
-
-		if moveData.Cancelled then
-			return false
-		end
-
-		if not reached then
-			return false
-		end
-	end
-
-	ActiveMoves[model] = nil
-
-	return true
-end
-
-function NPCController:IsMoving(model)
-	return ActiveMoves[model] ~= nil
+		Moving[npc] = nil
+	end)
 end
 
 return NPCController
