@@ -1,28 +1,60 @@
 {
-  "name": "CafeChaos",
-  "tree": {
-    "$className": "DataModel",
+	"name": "CafeChaos",
+	"tree": {
+		"$className": "DataModel",
 
-    "ReplicatedStorage": {
-      "$path": "src/ReplicatedStorage"
-    },
+		"ReplicatedStorage": {
+			"$path": "src/ReplicatedStorage"
+		},
 
-    "ServerScriptService": {
-      "$path": "src/ServerScriptService"
-    },
+		"ServerScriptService": {
+			"$path": "src/ServerScriptService"
+		},
 
-    "StarterPlayer": {
-      "StarterPlayerScripts": {
-        "$path": "src/StarterPlayer/StarterPlayerScripts"
-      }
-    },
+		"StarterPlayer": {
+			"StarterPlayerScripts": {
+				"$path": "src/StarterPlayer/StarterPlayerScripts"
+			}
+		},
 
-    "StarterGui": {
-      "$path": "src/StarterGui"
-    },
+		"StarterGui": {
+			"$path": "src/StarterGui"
+		},
 
-    "Workspace": {
-      "$path": "src/Workspace"
-    }
-  }
+		"Workspace": {
+			"$className": "Workspace",
+
+			"Camera": {
+				"$path": "src/Workspace/Camera.rbxm"
+			},
+
+			"Terrain": {
+				"$path": "src/Workspace/Terrain.rbxm"
+			},
+
+			"Map": {
+				"$path": "src/Workspace/Map.rbxm"
+			},
+
+			"QueuePoints": {
+				"$path": "src/Workspace/QueuePoints.rbxm"
+			},
+
+			"ExitPoint": {
+				"$path": "src/Workspace/ExitPoint.rbxm"
+			},
+
+			"NPCSpawn": {
+				"$className": "Folder"
+			},
+
+			"Customers": {
+				"$className": "Folder"
+			},
+
+			"Interactables": {
+				"$className": "Folder"
+			}
+		}
+	}
 }
